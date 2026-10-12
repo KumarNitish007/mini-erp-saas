@@ -1,0 +1,86 @@
+<app-page-header [title]="greeting + ', ' + (auth.user()?.fullName?.split(' ')?.[0] ?? '')"
+                 subtitle="Here's how your business is doing this month.">
+  <a mat-stroked-button routerLink="/products"><mat-icon>inventory_2</mat-icon> Stock</a>
+  <a mat-flat-button routerLink="/invoices/new"><mat-icon>add</mat-icon> New invoice</a>
+</app-page-header>
+
+@if (data(); as d) {
+  <section class="kpis">
+    <article class="kpi">
+      <span class="kpi-icon revenue"><mat-icon>trending_up</mat-icon></span>
+      <div>
+        <div class="kpi-label">Revenue this month</div>
+        <div class="kpi-value">{{ d.kpis.revenueThisMonth | inr }}</div>
+      </div>
+    </article>
+    <a class="kpi" routerLink="/invoices" [queryParams]="{ status: 'Issued' }">
+      <span class="kpi-icon outstanding"><mat-icon>account_balance_wallet</mat-icon></span>
+      <div>
+        <div class="kpi-label">Outstanding receivables</div>
+        <div class="kpi-value">{{ d.kpis.outstandingAmount | inr }}</div>
+      </div>
+    </a>
+    <a class="kpi" routerLink="/invoices" [queryParams]="{ overdue: true }">
+      <span class="kpi-icon overdue"><mat-icon>schedule</mat-icon></span>
+      <div>
+        <div class="kpi-label">Overdue · {{ d.kpis.overdueCount }} invoice{{ d.kpis.overdueCount === 1 ? '' : 's' }}</div>
+        <div class="kpi-value">{{ d.kpis.overdueAmount | inr }}</div>
+      </div>
+    </a>
+    <a class="kpi" routerLink="/products" [queryParams]="{ lowStock: true }">
+      <span class="kpi-icon stock"><mat-icon>warning_amber</mat-icon></span>
+      <div>
+        <div class="kpi-label">Items low on stock</div>
+        <div class="kpi-value">{{ d.kpis.lowStockCount }}</div>
+      </div>
+    </a>
+  </section>
+
+  <section class="grid">
+    <article class="card chart-card">
+      <div class="card-head">
+        <h2 class="card-title">Billing — last 6 months</h2>
+        <span class="muted small">{{ d.kpis.draftCount }} draft{{ d.kpis.draftCount === 1 ? '' : 's' }} · {{ d.kpis.customerCount }} customers</span>
+      </div>
+      <app-sales-chart [data]="d.monthlySales" />
+      <div class="period-strip">
+        <div><span class="muted small">Invoices</span><strong>{{ totals(d).count }}</strong></div>
+        <div><span class="muted small">Taxable value</span><strong>{{ totals(d).taxable | inr }}</strong></div>
+        <div><span class="muted small">GST collected</span><strong>{{ totals(d).tax | inr }}</strong></div>
+        <div><span class="muted small">Billed incl. GST</span><strong>{{ totals(d).billed | inr }}</strong></div>
+      </div>
+    </article>
+
+    <article class="card">
+      <h2 class="card-title">Top customers</h2>
+      @for (c of d.topCustomers; track c.id) {
+        <div class="row-item">
+          <div>
+            <div class="row-title">{{ c.name }}</div>
+            <div class="muted small">{{ c.invoiceCount }} invoices · {{ c.outstanding | inr }} due</div>
+          </div>
+          <strong class="num">{{ c.totalBilled | inr: 'compact' }}</strong>
+        </div>
+      } @empty {
+        <p class="muted">No billed invoices yet.</p>
+      }
+    </article>
+
+    <article class="card">
+      <h2 class="card-title">Reorder soon</h2>
+      @for (p of d.lowStock; track p.id) {
+        <div class="row-item">
+          <div>
+            <div class="row-title">{{ p.name }}</div>
+            <div class="muted small mono">{{ p.sku }}</div>
+          </div>
+          <span class="badge-low num">{{ p.stockQuantity }} / {{ p.reorderLevel }} {{ p.unit }}</span>
+        </div>
+      } @empty {
+        <p class="muted">All items are above their reorder level. 👍</p>
+      }
+    </article>
+  </section>
+} @else {
+  <mat-progress-bar mode="indeterminate" />
+}

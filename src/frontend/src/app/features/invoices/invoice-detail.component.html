@@ -1,0 +1,97 @@
+<a mat-button routerLink="/invoices" class="back"><mat-icon>arrow_back</mat-icon> All invoices</a>
+
+@if (invoice(); as inv) {
+  @if (busy()) { <mat-progress-bar mode="indeterminate" /> }
+
+  <header class="head">
+    <div>
+      <div class="title-row">
+        <h1 class="mono">{{ inv.number ?? 'Draft invoice' }}</h1>
+        <app-status-chip [status]="inv.status" [overdue]="inv.isOverdue" />
+      </div>
+      <p class="muted">
+        {{ inv.customer.name }} · issued {{ inv.invoiceDate | date: 'dd MMM yyyy' }} · due {{ inv.dueDate | date: 'dd MMM yyyy' }}
+        @if (inv.paidAtUtc) { · paid {{ inv.paidAtUtc | date: 'dd MMM yyyy' }} }
+      </p>
+    </div>
+
+    <div class="actions">
+      <button mat-stroked-button (click)="downloadPdf()" [disabled]="busy()"><mat-icon>picture_as_pdf</mat-icon> PDF</button>
+      @switch (inv.status) {
+        @case ('Draft') {
+          <a mat-stroked-button [routerLink]="['/invoices', inv.id, 'edit']"><mat-icon>edit</mat-icon> Edit</a>
+          <button mat-flat-button (click)="issue()" [disabled]="busy()"><mat-icon>send</mat-icon> Issue</button>
+        }
+        @case ('Issued') {
+          <button mat-flat-button (click)="markPaid()" [disabled]="busy()"><mat-icon>payments</mat-icon> Mark paid</button>
+        }
+      }
+      @if (inv.status === 'Draft' || (inv.status === 'Issued' && auth.isManager())) {
+        <button mat-icon-button [matMenuTriggerFor]="more" aria-label="More actions"><mat-icon>more_vert</mat-icon></button>
+        <mat-menu #more="matMenu">
+          @if (inv.status === 'Draft') {
+            <button mat-menu-item (click)="remove()"><mat-icon>delete</mat-icon> Delete draft</button>
+          }
+          @if (auth.isManager()) {
+            <button mat-menu-item (click)="cancel()"><mat-icon>block</mat-icon> Cancel invoice</button>
+          }
+        </mat-menu>
+      }
+    </div>
+  </header>
+
+  <section class="sheet card">
+    <div class="parties">
+      <div>
+        <div class="label">Billed to</div>
+        <strong>{{ inv.customer.name }}</strong>
+        @if (inv.customer.billingAddress) { <div>{{ inv.customer.billingAddress }}</div> }
+        <div class="muted">Place of supply: {{ inv.customer.stateName }} ({{ inv.customer.stateCode }})</div>
+        @if (inv.customer.gstin) { <div class="mono">GSTIN {{ inv.customer.gstin }}</div> }
+      </div>
+      <div class="supply">
+        <div class="label">Tax treatment</div>
+        <strong>{{ inv.isInterState ? 'Inter-state · IGST' : 'Intra-state · CGST + SGST' }}</strong>
+      </div>
+    </div>
+
+    <div class="table-scroll">
+      <table class="lines">
+        <thead>
+          <tr><th>#</th><th>Item</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">GST</th><th class="num">Tax</th><th class="num">Amount</th></tr>
+        </thead>
+        <tbody>
+          @for (l of inv.lines; track l.id; let i = $index) {
+            <tr>
+              <td>{{ i + 1 }}</td>
+              <td>{{ l.description }}</td>
+              <td class="num">{{ l.quantity }}</td>
+              <td class="num">{{ l.unitPrice | inr }}</td>
+              <td class="num">{{ l.gstRate }}%</td>
+              <td class="num">{{ l.taxAmount | inr }}</td>
+              <td class="num"><strong>{{ l.lineTotal | inr }}</strong></td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <div class="footer">
+      <div class="notes">
+        @if (inv.notes) { <div class="label">Notes</div><p>{{ inv.notes }}</p> }
+      </div>
+      <div class="totals">
+        <div class="t-row"><span>Taxable value</span><span class="num">{{ inv.subTotal | inr }}</span></div>
+        @if (inv.isInterState) {
+          <div class="t-row"><span>IGST</span><span class="num">{{ inv.igstAmount | inr }}</span></div>
+        } @else {
+          <div class="t-row"><span>CGST</span><span class="num">{{ inv.cgstAmount | inr }}</span></div>
+          <div class="t-row"><span>SGST</span><span class="num">{{ inv.sgstAmount | inr }}</span></div>
+        }
+        <div class="t-row grand"><span>Grand total</span><span class="num">{{ inv.grandTotal | inr }}</span></div>
+      </div>
+    </div>
+  </section>
+} @else {
+  <mat-progress-bar mode="indeterminate" />
+}

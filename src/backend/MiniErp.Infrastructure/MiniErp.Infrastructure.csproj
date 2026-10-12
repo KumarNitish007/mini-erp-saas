@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Dapper" Version="2.1.35" />
+    <PackageReference Include="dbup-sqlserver" Version="7.2.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.11" />
+    <PackageReference Include="Microsoft.Extensions.Identity.Core" Version="8.0.11" />
+    <PackageReference Include="QuestPDF" Version="2024.12.3" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MiniErp.Application\MiniErp.Application.csproj" />
+  </ItemGroup>
+
+  <!-- The SQL scripts in /database are the single source of truth for the schema; DbUp runs them from here. -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\..\database\**\*.sql" LinkBase="Database" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="MiniErp.UnitTests" />
+    <InternalsVisibleTo Include="MiniErp.IntegrationTests" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,101 @@
+<app-page-header [title]="id() ? 'Edit draft invoice' : 'New invoice'"
+                 subtitle="Totals update live; the server recalculates and stores the final GST.">
+  <a mat-button [routerLink]="id() ? ['/invoices', id()] : '/invoices'">Cancel</a>
+</app-page-header>
+
+@if (loading()) {
+  <mat-progress-bar mode="indeterminate" />
+} @else {
+  <form [formGroup]="form" class="editor">
+    <section class="card">
+      <div class="form-grid">
+        <mat-form-field class="span-2">
+          <mat-label>Customer</mat-label>
+          <mat-select formControlName="customerId">
+            @for (c of customers(); track c.id) {
+              <mat-option [value]="c.id">{{ c.name }} <span class="muted">· {{ c.stateName }}</span></mat-option>
+            }
+          </mat-select>
+          @if (selectedCustomer(); as c) {
+            <mat-hint>{{ isInterState() ? 'Inter-state supply → IGST' : 'Intra-state supply → CGST + SGST' }}
+              @if (c.gstin) { · GSTIN {{ c.gstin }} }</mat-hint>
+          }
+        </mat-form-field>
+        <mat-form-field>
+          <mat-label>Invoice date</mat-label>
+          <input matInput type="date" formControlName="invoiceDate">
+        </mat-form-field>
+        <mat-form-field>
+          <mat-label>Due date</mat-label>
+          <input matInput type="date" formControlName="dueDate">
+        </mat-form-field>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2 class="card-title">Items</h2>
+      <div class="lines" formArrayName="lines">
+        @for (line of lines.controls; track line; let i = $index) {
+          <div class="line" [formGroupName]="i">
+            <mat-form-field class="product">
+              <mat-label>Product</mat-label>
+              <mat-select formControlName="productId" (selectionChange)="productChanged(line)">
+                @for (p of products(); track p.id) {
+                  <mat-option [value]="p.id">{{ p.name }} <span class="muted mono">· {{ p.sku }} · {{ p.stockQuantity }} {{ p.unit }}</span></mat-option>
+                }
+              </mat-select>
+              @if (productOf(line); as p) {
+                <mat-hint [class.warn]="line.controls.quantity.value > p.stockQuantity">
+                  GST {{ p.gstRate }}% · in stock {{ p.stockQuantity }} {{ p.unit }}
+                </mat-hint>
+              }
+            </mat-form-field>
+            <mat-form-field class="qty">
+              <mat-label>Qty</mat-label>
+              <input matInput type="number" min="0" formControlName="quantity">
+            </mat-form-field>
+            <mat-form-field class="price">
+              <mat-label>Rate (₹)</mat-label>
+              <input matInput type="number" min="0" step="0.01" formControlName="unitPrice">
+            </mat-form-field>
+            <div class="amount num">
+              <div>{{ preview().lines.at(i)?.total | inr }}</div>
+              <small class="muted">incl. {{ preview().lines.at(i)?.tax | inr }} tax</small>
+            </div>
+            <button mat-icon-button type="button" (click)="removeLine(i)" [disabled]="lines.length === 1" matTooltip="Remove line">
+              <mat-icon>delete_outline</mat-icon>
+            </button>
+          </div>
+        }
+      </div>
+      <button mat-stroked-button type="button" (click)="addLine()"><mat-icon>add</mat-icon> Add item</button>
+    </section>
+
+    <section class="bottom">
+      <div class="card notes">
+        <mat-form-field class="full-width">
+          <mat-label>Notes (printed on invoice)</mat-label>
+          <textarea matInput rows="4" formControlName="notes" placeholder="Payment terms, bank details, delivery notes…"></textarea>
+        </mat-form-field>
+      </div>
+
+      <div class="card totals">
+        <div class="t-row"><span>Taxable value</span><span class="num">{{ preview().totals.subTotal | inr }}</span></div>
+        @if (isInterState()) {
+          <div class="t-row"><span>IGST</span><span class="num">{{ preview().totals.igst | inr }}</span></div>
+        } @else {
+          <div class="t-row"><span>CGST</span><span class="num">{{ preview().totals.cgst | inr }}</span></div>
+          <div class="t-row"><span>SGST</span><span class="num">{{ preview().totals.sgst | inr }}</span></div>
+        }
+        <div class="t-row grand"><span>Grand total</span><span class="num">{{ preview().totals.grandTotal | inr }}</span></div>
+
+        <div class="actions">
+          <button mat-stroked-button type="button" (click)="save(false)" [disabled]="busy()">Save draft</button>
+          <button mat-flat-button type="button" (click)="save(true)" [disabled]="busy()">
+            <mat-icon>send</mat-icon> Save &amp; issue
+          </button>
+        </div>
+      </div>
+    </section>
+  </form>
+}

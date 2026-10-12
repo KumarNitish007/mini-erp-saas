@@ -1,0 +1,46 @@
+# One-command local stack: SQL Server + API + Angular (nginx).
+#   cp .env.example .env   # then edit the two secrets
+#   docker compose up --build
+#   open http://localhost:8080
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD in .env}
+    volumes:
+      - sqldata:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  api:
+    build:
+      context: .
+      dockerfile: src/backend/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Default: "Server=sqlserver;Database=MiniErp;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True"
+      Jwt__Key: ${JWT_KEY:?Set JWT_KEY in .env}
+      Database__CreateIfMissing: "true"
+      Database__SeedDemoData: ${SEED_DEMO_DATA:-true}
+      Swagger__Enabled: "true"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    ports:
+      - "5080:8080"
+
+  web:
+    build:
+      context: src/frontend
+    depends_on:
+      - api
+    ports:
+      - "8080:80"
+
+volumes:
+  sqldata:
