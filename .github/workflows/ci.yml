@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend · build & test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        run: dotnet restore MiniErp.sln
+
+      - name: Build
+        run: dotnet build MiniErp.sln -c Release --no-restore
+
+      - name: Unit tests
+        run: dotnet test tests/MiniErp.UnitTests -c Release --no-build --logger "trx;LogFileName=unit.trx"
+
+      # Spins up a real SQL Server 2022 container via Testcontainers.
+      - name: Integration tests (SQL Server in Docker)
+        run: dotnet test tests/MiniErp.IntegrationTests -c Release --no-build --logger "trx;LogFileName=integration.trx"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: tests/**/TestResults/*.trx
+
+  frontend:
+    name: Frontend · build & test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/frontend/package-lock.json
+
+      - run: npm ci
+      - run: npx ng build --configuration production
+      - run: npm run test:ci
+
+  docker:
+    name: Docker images build
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build API and web images
+        env:
+          MSSQL_SA_PASSWORD: ci-only-not-a-secret-1A
+          JWT_KEY: ci-only-not-a-secret-key-0123456789abcdef
+        run: docker compose build
